@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,7 +33,28 @@ fun CatalogScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("NanaDrop - Digital Store") }
+                title = { Text("NanaDrop - Digital Store") },
+                actions = {
+                    // ViewModel-ден себеттің санын оқып аламыз
+                    val cartCount by viewModel.totalCartItemsCount.collectAsState()
+
+                    BadgedBox(
+                        badge = {
+                            if (cartCount > 0) {
+                                Badge {
+                                    Text(text = cartCount.toString())
+                                }
+                            }
+                        }
+                    ) {
+                        IconButton(onClick = { /* Себет экранына өту (onCartClick немесе navController) */ }) {
+                            Icon(
+                                imageVector = Icons.Default.ShoppingCart,
+                                contentDescription = "Cart"
+                            )
+                        }
+                    }
+                }
             )
         }
     ) { innerPadding ->
