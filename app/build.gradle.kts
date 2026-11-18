@@ -52,4 +52,8 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    // Navigation Compose
+    implementation("androidx.navigation:navigation-compose:2.8.5")
+    // Lifecycle ViewModel Compose
+    implementation("androidx.lifecycle:viewmodel-compose:2.8.7")
 }
