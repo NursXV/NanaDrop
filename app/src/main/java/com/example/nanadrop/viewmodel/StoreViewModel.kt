@@ -1,11 +1,15 @@
 package com.example.nanadrop.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.nanadrop.data.DigitalProduct
 import com.example.nanadrop.data.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 class StoreViewModel : ViewModel() {
 
@@ -25,6 +29,14 @@ class StoreViewModel : ViewModel() {
     private val _cartItems = MutableStateFlow<List<DigitalProduct>>(emptyList())
     val cartItems: StateFlow<List<DigitalProduct>> = _cartItems.asStateFlow()
 
+    // Себеттегі барлық тауарлардың жалпы санын есептеу
+    val totalCartItemsCount: StateFlow<Int> = _cartItems
+        .map { items -> items.size }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
         filterProducts(query, _selectedCategory.value)
