@@ -25,6 +25,7 @@ import com.example.nanadrop.ui.screen.DetailsScreen
 import com.example.nanadrop.ui.theme.NanaDropTheme
 import com.example.nanadrop.ui.viewmodel.StoreViewModel
 
+
 class MainActivity : ComponentActivity() {
     private val storeViewModel: StoreViewModel by viewModels()
 

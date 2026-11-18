@@ -5,15 +5,22 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.nanadrop.data.DigitalProduct
+import com.example.nanadrop.ui.viewmodel.StoreViewModel
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun CategoryChip(
@@ -32,6 +39,7 @@ fun CategoryChip(
 @Composable
 fun ProductCard(
     product: DigitalProduct,
+    viewModel: StoreViewModel = viewModel(),
     onProductClick: (String) -> Unit,
     onAddToCart: (DigitalProduct) -> Unit,
     modifier: Modifier = Modifier
@@ -105,18 +113,28 @@ fun ProductCard(
                     color = MaterialTheme.colorScheme.primary
                 )
 
+                val cartItems = viewModel.cartItems.collectAsState().value
+                val isInCart = cartItems.any { it.id == product.id }
+
                 Button(
-                    onClick = { onAddToCart(product) },
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    onClick = {
+                        if (!isInCart) {
+                            onAddToCart(product) // Немесе viewModel.addToCart(product)
+                        }
+                    },
+                    shape = RoundedCornerShape(size = 12.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isInCart) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                    )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ShoppingCart,
-                        contentDescription = "Add to Cart",
+                        imageVector = if (isInCart) Icons.Default.Check else Icons.Default.ShoppingCart,
+                        contentDescription = if (isInCart) "Added" else "Add to Cart",
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Buy")
+                    Text(text = if (isInCart) "Added" else "Buy")
                 }
             }
         }
