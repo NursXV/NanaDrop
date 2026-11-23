@@ -34,15 +34,10 @@ fun DealsScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Special Game Deals") },
-                actions = {
-                    IconButton(onClick = { viewModel.retry() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh Deals")
-                    }
-                }
-            )
+        floatingActionButton = {
+            FloatingActionButton(onClick = { viewModel.retry() }) {
+                Icon(Icons.Default.Refresh, contentDescription = "Refresh Deals")
+            }
         }
     ) { innerPadding ->
         Box(

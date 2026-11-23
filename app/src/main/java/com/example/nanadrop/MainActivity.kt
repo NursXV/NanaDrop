@@ -7,13 +7,12 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -22,6 +21,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.nanadrop.data.ProductRepository
+import com.example.nanadrop.ui.components.SettingsBottomSheet
 import com.example.nanadrop.ui.screen.CartScreen
 import com.example.nanadrop.ui.screen.CatalogScreen
 import com.example.nanadrop.ui.screen.DetailsScreen
@@ -33,6 +33,7 @@ import com.example.nanadrop.ui.viewmodel.MarketplaceViewModel
 import com.example.nanadrop.ui.viewmodel.StoreViewModel
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     private val storeViewModel: StoreViewModel by viewModels()
     private val marketplaceViewModel: MarketplaceViewModel by viewModels {
@@ -44,6 +45,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val isDarkMode by marketplaceViewModel.isDarkMode.collectAsState()
+            var showSettingsSheet by remember { mutableStateOf(false) }
+
             NanaDropTheme(darkTheme = isDarkMode) {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -51,21 +54,32 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    bottomBar = {
-                        if (currentRoute == "catalog" || currentRoute == "marketplace" || currentRoute == "deals" || currentRoute == "cart") {
-                            NavigationBar {
-                                NavigationBarItem(
-                                    icon = { Icon(Icons.Default.Home, contentDescription = "Catalog") },
-                                    label = { Text("Catalog") },
-                                    selected = currentRoute == "catalog",
-                                    onClick = {
-                                        if (currentRoute != "catalog") {
-                                            navController.navigate("catalog") {
-                                                popUpTo("catalog") { inclusive = true }
-                                            }
-                                        }
+                    topBar = {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    when (currentRoute) {
+                                        "marketplace" -> "NanaDrop Marketplace"
+                                        "deals" -> "Special Game Deals"
+                                        "cart" -> "Shopping Cart"
+                                        "catalog" -> "Digital Product Catalog"
+                                        else -> "NanaDrop"
                                     }
                                 )
+                            },
+                            navigationIcon = {
+                                IconButton(onClick = { showSettingsSheet = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Settings Menu"
+                                    )
+                                }
+                            }
+                        )
+                    },
+                    bottomBar = {
+                        if (currentRoute == "marketplace" || currentRoute == "deals" || currentRoute == "cart") {
+                            NavigationBar {
                                 NavigationBarItem(
                                     icon = { Icon(Icons.Default.Storefront, contentDescription = "Marketplace") },
                                     label = { Text("Marketplace") },
@@ -102,7 +116,7 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = "catalog",
+                        startDestination = "marketplace",
                         modifier = Modifier.padding(innerPadding)
                     ) {
                         composable("catalog") {
@@ -139,6 +153,13 @@ class MainActivity : ComponentActivity() {
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
+                    }
+
+                    if (showSettingsSheet) {
+                        SettingsBottomSheet(
+                            viewModel = marketplaceViewModel,
+                            onDismissRequest = { showSettingsSheet = false }
+                        )
                     }
                 }
             }

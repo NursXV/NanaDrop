@@ -36,26 +36,12 @@ fun MarketplaceScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val hideSoldListings by viewModel.hideSoldListings.collectAsState()
-    val isDarkMode by viewModel.isDarkMode.collectAsState()
     val isDialogOpen by viewModel.isDialogOpen.collectAsState()
     val editingListing by viewModel.editingListing.collectAsState()
 
     val categories = listOf("All", "Keys", "Accounts", "Subscriptions", "Hardware", "Other")
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("NanaDrop Marketplace") },
-                actions = {
-                    IconButton(onClick = { viewModel.toggleDarkMode(!isDarkMode) }) {
-                        Icon(
-                            imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = "Toggle Dark Mode"
-                        )
-                    }
-                }
-            )
-        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { viewModel.openCreateDialog() },
