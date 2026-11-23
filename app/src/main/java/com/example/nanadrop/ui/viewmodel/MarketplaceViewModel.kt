@@ -50,12 +50,18 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
     private val _editingListing = MutableStateFlow<ListingEntity?>(null)
     val editingListing: StateFlow<ListingEntity?> = _editingListing.asStateFlow()
 
-    // Filter & Search state
+    // Filter, Search, Sort & User Listing state
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     private val _selectedCategory = MutableStateFlow("All")
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
+
+    private val _sortOption = MutableStateFlow("Newest")
+    val sortOption: StateFlow<String> = _sortOption.asStateFlow()
+
+    private val _onlyUserListings = MutableStateFlow(false)
+    val onlyUserListings: StateFlow<Boolean> = _onlyUserListings.asStateFlow()
 
     val filteredListings: StateFlow<List<ListingEntity>>
 
@@ -73,15 +79,32 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
             allListings,
             _searchQuery,
             _selectedCategory,
-            hideSoldListings
-        ) { listings, query, category, hideSold ->
-            listings.filter { listing ->
+            hideSoldListings,
+            _onlyUserListings,
+            _sortOption
+        ) { flowArray ->
+            @Suppress("UNCHECKED_CAST")
+            val listings = flowArray[0] as List<ListingEntity>
+            val query = flowArray[1] as String
+            val category = flowArray[2] as String
+            val hideSold = flowArray[3] as Boolean
+            val userOnly = flowArray[4] as Boolean
+            val sort = flowArray[5] as String
+
+            val filtered = listings.filter { listing ->
                 val matchesQuery = listing.title.contains(query, ignoreCase = true) ||
                         listing.description.contains(query, ignoreCase = true) ||
                         listing.sellerName.contains(query, ignoreCase = true)
                 val matchesCategory = category == "All" || listing.category.equals(category, ignoreCase = true)
                 val matchesSoldFilter = !hideSold || !listing.isSold
-                matchesQuery && matchesCategory && matchesSoldFilter
+                val matchesUserOnly = !userOnly || listing.isUserListing
+                matchesQuery && matchesCategory && matchesSoldFilter && matchesUserOnly
+            }
+
+            when (sort) {
+                "Price: Low to High" -> filtered.sortedBy { it.price }
+                "Price: High to Low" -> filtered.sortedByDescending { it.price }
+                else -> filtered.sortedByDescending { it.id } // "Newest"
             }
         }.stateIn(
             scope = viewModelScope,
@@ -96,6 +119,14 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
 
     fun setSelectedCategory(category: String) {
         _selectedCategory.value = category
+    }
+
+    fun setSortOption(option: String) {
+        _sortOption.value = option
+    }
+
+    fun toggleOnlyUserListings(enabled: Boolean) {
+        _onlyUserListings.value = enabled
     }
 
     fun toggleHideSoldListings(hide: Boolean) {

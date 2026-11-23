@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -42,12 +43,16 @@ fun MarketplaceScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val hideSoldListings by viewModel.hideSoldListings.collectAsState()
+    val sortOption by viewModel.sortOption.collectAsState()
     val isDialogOpen by viewModel.isDialogOpen.collectAsState()
     val editingListing by viewModel.editingListing.collectAsState()
     val cartItems by storeViewModel.cartItems.collectAsState()
     val totalCartCount by storeViewModel.totalCartItemsCount.collectAsState()
 
+    var sortDropdownExpanded by remember { mutableStateOf(false) }
+
     val categories = listOf("All", "Keys", "Accounts", "Subscriptions", "Hardware", "Other")
+    val sortOptions = listOf("Newest", "Price: Low to High", "Price: High to Low")
 
     Scaffold(
         topBar = {
@@ -145,7 +150,54 @@ fun MarketplaceScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Compact Header / Info Bar showing listing count and sort selector
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Listings: ${listings.size}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Box {
+                        AssistChip(
+                            onClick = { sortDropdownExpanded = true },
+                            label = { Text(sortOption) },
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Select sorting option"
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        DropdownMenu(
+                            expanded = sortDropdownExpanded,
+                            onDismissRequest = { sortDropdownExpanded = false }
+                        ) {
+                            sortOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        viewModel.setSortOption(option)
+                                        sortDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 if (listings.isEmpty()) {
                     Box(

@@ -3,6 +3,7 @@ package com.example.nanadrop.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -23,6 +24,7 @@ fun SettingsBottomSheet(
 ) {
     val isDarkMode by viewModel.isDarkMode.collectAsState()
     val hideSold by viewModel.hideSoldListings.collectAsState()
+    val onlyUserListings by viewModel.onlyUserListings.collectAsState()
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -115,6 +117,42 @@ fun SettingsBottomSheet(
                         Switch(
                             checked = hideSold,
                             onCheckedChange = { viewModel.toggleHideSoldListings(it) }
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column {
+                                Text(
+                                    text = "My Listings Only",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Show only listings created by you",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = onlyUserListings,
+                            onCheckedChange = { viewModel.toggleOnlyUserListings(it) }
                         )
                     }
                 }
