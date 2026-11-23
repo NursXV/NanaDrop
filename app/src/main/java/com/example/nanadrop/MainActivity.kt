@@ -128,7 +128,11 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("marketplace") {
-                            MarketplaceScreen(viewModel = marketplaceViewModel)
+                            MarketplaceScreen(
+                                viewModel = marketplaceViewModel,
+                                storeViewModel = storeViewModel,
+                                onNavigateToCart = { navController.navigate("cart") }
+                            )
                         }
                         composable("deals") {
                             DealsScreen(viewModel = dealsViewModel)

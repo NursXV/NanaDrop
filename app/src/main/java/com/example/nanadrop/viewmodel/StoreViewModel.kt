@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.nanadrop.data.DigitalProduct
 import com.example.nanadrop.data.ProductRepository
+import com.example.nanadrop.data.local.ListingEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -67,4 +68,17 @@ class StoreViewModel : ViewModel() {
     fun removeFromCart(product: DigitalProduct) {
         _cartItems.value = _cartItems.value - product
     }
+
+    fun addListingToCart(listing: ListingEntity) {
+        val digitalProduct = DigitalProduct(
+            id = "lot_${listing.id}",
+            title = listing.title,
+            category = listing.category,
+            price = listing.price,
+            description = listing.description,
+            platform = listing.platform
+        )
+        addToCart(digitalProduct)
+    }
+
 }
