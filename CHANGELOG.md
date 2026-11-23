@@ -2,6 +2,14 @@
 
 All notable changes to the **NanaDrop** project will be documented in this file.
 
+## [0.0.4] - 2026-11-23
+### Added
+- **Marketplace Enhancements:** Added sold status to listings.
+- **Cart Integration:** Integrated cart from Marketplace with "Buy" / "Added" state, cart badge counter, and CartScreen.
+- **Listing Details Screen:** Added ListingDetailsScreen with listingId navigation argument, back navigation, Add to Cart, and Buy Now.
+- **Advanced Search & Filtering:** Implemented search, category filtering, Hide Sold, My Listings Only filter, active listings counter, and sorting (Newest, Price: Low to High, Price: High to Low).
+- **Top Bar Menu & Preferences:** Added top bar three-line menu and preferences persistence via DataStore (e.g., Dark Theme, Hide Sold).
+
 ## [0.0.3] - 2025-03-XX
 ### Added
 - **Marketplace CRUD & Room Persistence:** Added full Create, Read, Update, and Delete (CRUD) operations for marketplace items with local Room database storage, ensuring all data persists reliably across app sessions.
