@@ -1,6 +1,7 @@
 package com.example.nanadrop.ui.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -34,7 +35,8 @@ import com.example.nanadrop.ui.viewmodel.StoreViewModel
 fun MarketplaceScreen(
     viewModel: MarketplaceViewModel,
     storeViewModel: StoreViewModel,
-    onNavigateToCart: () -> Unit
+    onNavigateToCart: () -> Unit,
+    onListingClick: (Long) -> Unit = {}
 ) {
     val listings by viewModel.filteredListings.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -167,6 +169,7 @@ fun MarketplaceScreen(
                         items(listings, key = { it.id }) { listing ->
                             ListingCard(
                                 listing = listing,
+                                onClick = { onListingClick(listing.id) },
                                 onEditClick = { viewModel.openEditDialog(listing) },
                                 onDeleteClick = { viewModel.deleteListing(listing) },
                                 onToggleSoldClick = { viewModel.toggleSoldStatus(listing) },
@@ -206,6 +209,7 @@ fun MarketplaceScreen(
 @Composable
 fun ListingCard(
     listing: ListingEntity,
+    onClick: () -> Unit = {},
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onToggleSoldClick: () -> Unit,
@@ -215,7 +219,9 @@ fun ListingCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         colors = CardDefaults.cardColors(

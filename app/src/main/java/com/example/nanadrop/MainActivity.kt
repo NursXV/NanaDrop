@@ -26,6 +26,7 @@ import com.example.nanadrop.ui.screen.CartScreen
 import com.example.nanadrop.ui.screen.CatalogScreen
 import com.example.nanadrop.ui.screen.DetailsScreen
 import com.example.nanadrop.ui.screen.DealsScreen
+import com.example.nanadrop.ui.screen.ListingDetailsScreen
 import com.example.nanadrop.ui.screen.MarketplaceScreen
 import com.example.nanadrop.ui.theme.NanaDropTheme
 import com.example.nanadrop.ui.viewmodel.DealsViewModel
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
                                         "deals" -> "Special Game Deals"
                                         "cart" -> "Shopping Cart"
                                         "catalog" -> "Digital Product Catalog"
+                                        "listing_details/{listingId}" -> "Listing Details"
                                         else -> "NanaDrop"
                                     }
                                 )
@@ -131,7 +133,10 @@ class MainActivity : ComponentActivity() {
                             MarketplaceScreen(
                                 viewModel = marketplaceViewModel,
                                 storeViewModel = storeViewModel,
-                                onNavigateToCart = { navController.navigate("cart") }
+                                onNavigateToCart = { navController.navigate("cart") },
+                                onListingClick = { listingId ->
+                                    navController.navigate("listing_details/$listingId")
+                                }
                             )
                         }
                         composable("deals") {
@@ -149,6 +154,18 @@ class MainActivity : ComponentActivity() {
                                 onAddToCart = { prod ->
                                     storeViewModel.addToCart(prod)
                                 }
+                            )
+                        }
+                        composable(
+                            route = "listing_details/{listingId}",
+                            arguments = listOf(navArgument("listingId") { type = NavType.LongType })
+                        ) { backStackEntry ->
+                            val listingId = backStackEntry.arguments?.getLong("listingId") ?: 0L
+                            ListingDetailsScreen(
+                                listingId = listingId,
+                                marketplaceViewModel = marketplaceViewModel,
+                                storeViewModel = storeViewModel,
+                                onBackClick = { navController.popBackStack() }
                             )
                         }
                         composable("cart") {
