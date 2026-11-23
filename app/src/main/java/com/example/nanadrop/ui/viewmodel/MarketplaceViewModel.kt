@@ -7,7 +7,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.nanadrop.data.local.ListingEntity
 import com.example.nanadrop.data.local.MarketplaceDatabase
+import com.example.nanadrop.data.local.UserPreferencesRepository
 import com.example.nanadrop.data.repository.LocalMarketplaceRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -24,7 +26,22 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private val repository: LocalMarketplaceRepository
+    private val userPreferencesRepository = UserPreferencesRepository(application)
+
     val allListings: StateFlow<List<ListingEntity>>
+
+    // DataStore Preference Flows
+    val hideSoldListings: StateFlow<Boolean> = userPreferencesRepository.hideSoldListings.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
+
+    val isDarkMode: StateFlow<Boolean> = userPreferencesRepository.isDarkMode.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
 
     // Dialog & Editing State
     private val _isDialogOpen = MutableStateFlow(false)
@@ -52,13 +69,19 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
             initialValue = emptyList()
         )
 
-        filteredListings = combine(allListings, _searchQuery, _selectedCategory) { listings, query, category ->
+        filteredListings = combine(
+            allListings,
+            _searchQuery,
+            _selectedCategory,
+            hideSoldListings
+        ) { listings, query, category, hideSold ->
             listings.filter { listing ->
                 val matchesQuery = listing.title.contains(query, ignoreCase = true) ||
                         listing.description.contains(query, ignoreCase = true) ||
                         listing.sellerName.contains(query, ignoreCase = true)
                 val matchesCategory = category == "All" || listing.category.equals(category, ignoreCase = true)
-                matchesQuery && matchesCategory
+                val matchesSoldFilter = !hideSold || !listing.isSold
+                matchesQuery && matchesCategory && matchesSoldFilter
             }
         }.stateIn(
             scope = viewModelScope,
@@ -73,6 +96,18 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
 
     fun setSelectedCategory(category: String) {
         _selectedCategory.value = category
+    }
+
+    fun toggleHideSoldListings(hide: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            userPreferencesRepository.setHideSoldListings(hide)
+        }
+    }
+
+    fun toggleDarkMode(darkMode: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            userPreferencesRepository.setDarkMode(darkMode)
+        }
     }
 
     fun openCreateDialog() {
