@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -22,12 +23,17 @@ import com.example.nanadrop.data.ProductRepository
 import com.example.nanadrop.ui.screen.CartScreen
 import com.example.nanadrop.ui.screen.CatalogScreen
 import com.example.nanadrop.ui.screen.DetailsScreen
+import com.example.nanadrop.ui.screen.MarketplaceScreen
 import com.example.nanadrop.ui.theme.NanaDropTheme
+import com.example.nanadrop.ui.viewmodel.MarketplaceViewModel
 import com.example.nanadrop.ui.viewmodel.StoreViewModel
 
 
 class MainActivity : ComponentActivity() {
     private val storeViewModel: StoreViewModel by viewModels()
+    private val marketplaceViewModel: MarketplaceViewModel by viewModels {
+        MarketplaceViewModel.Factory(application)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,7 +46,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        if (currentRoute == "catalog" || currentRoute == "cart") {
+                        if (currentRoute == "catalog" || currentRoute == "marketplace" || currentRoute == "cart") {
                             NavigationBar {
                                 NavigationBarItem(
                                     icon = { Icon(Icons.Default.Home, contentDescription = "Catalog") },
@@ -51,6 +57,16 @@ class MainActivity : ComponentActivity() {
                                             navController.navigate("catalog") {
                                                 popUpTo("catalog") { inclusive = true }
                                             }
+                                        }
+                                    }
+                                )
+                                NavigationBarItem(
+                                    icon = { Icon(Icons.Default.Storefront, contentDescription = "Marketplace") },
+                                    label = { Text("Marketplace") },
+                                    selected = currentRoute == "marketplace",
+                                    onClick = {
+                                        if (currentRoute != "marketplace") {
+                                            navController.navigate("marketplace")
                                         }
                                     }
                                 )
@@ -80,6 +96,9 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("details/$productId")
                                 }
                             )
+                        }
+                        composable("marketplace") {
+                            MarketplaceScreen(viewModel = marketplaceViewModel)
                         }
                         composable(
                             route = "details/{productId}",
