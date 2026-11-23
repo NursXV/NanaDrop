@@ -13,23 +13,23 @@ import kotlinx.coroutines.flow.stateIn
 
 class StoreViewModel : ViewModel() {
 
-    // Барлық тауарлар тізімі
+    // товарлардын тызымыго крч
     private val _products = MutableStateFlow<List<DigitalProduct>>(ProductRepository.products)
     val products: StateFlow<List<DigitalProduct>> = _products.asStateFlow()
 
-    // Іздеу жолағының мәтіні
+    // ыздеу жол текст
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    // Таңдалған категория (Filters: All, Keys, Accounts, Subscriptions)
+    // котегориялар (Filters: All, Keys, Accounts, Subscriptions)
     private val _selectedCategory = MutableStateFlow("All")
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
-    // Себетке қосылған тауарлар тізімі
+    // лист что добавлен
     private val _cartItems = MutableStateFlow<List<DigitalProduct>>(emptyList())
     val cartItems: StateFlow<List<DigitalProduct>> = _cartItems.asStateFlow()
 
-    // Себеттегі барлық тауарлардың жалпы санын есептеу
+    // барын санау
     val totalCartItemsCount: StateFlow<Int> = _cartItems
         .map { items -> items.size }
         .stateIn(

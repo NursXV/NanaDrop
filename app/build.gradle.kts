@@ -5,9 +5,7 @@ plugins {
 
 android {
     namespace = "com.example.nanadrop"
-    compileSdk {
-        version = release(37)
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.nanadrop"
@@ -55,4 +53,23 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.5")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Retrofit & JSON Converter
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+
+    // Kotlin Coroutines
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
+
+    // Coil
+    implementation(libs.coil.compose)
+
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    annotationProcessor(libs.room.compiler)
+
+    // Preferences DataStore
+    implementation(libs.datastore.preferences)
 }

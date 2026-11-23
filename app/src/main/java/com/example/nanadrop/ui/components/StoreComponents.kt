@@ -119,7 +119,7 @@ fun ProductCard(
                 Button(
                     onClick = {
                         if (!isInCart) {
-                            onAddToCart(product) // Немесе viewModel.addToCart(product)
+                            onAddToCart(product)
                         }
                     },
                     shape = RoundedCornerShape(size = 12.dp),
