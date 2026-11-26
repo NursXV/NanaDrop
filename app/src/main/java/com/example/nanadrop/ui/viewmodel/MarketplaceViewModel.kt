@@ -5,8 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.nanadrop.data.DigitalProduct
 import com.example.nanadrop.data.local.ListingEntity
 import com.example.nanadrop.data.local.MarketplaceDatabase
+import com.example.nanadrop.data.local.OrderEntity
 import com.example.nanadrop.data.local.UserPreferencesRepository
 import com.example.nanadrop.data.repository.LocalMarketplaceRepository
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +30,13 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
     private val repository: LocalMarketplaceRepository
     private val userPreferencesRepository = UserPreferencesRepository(application)
 
+    val currentUserName = "You (CurrentUser)"
+
     val allListings: StateFlow<List<ListingEntity>>
+    val allOrders: StateFlow<List<OrderEntity>>
+
+    val purchases: StateFlow<List<OrderEntity>>
+    val sales: StateFlow<List<OrderEntity>>
 
     // DataStore Preference Flows
     val hideSoldListings: StateFlow<Boolean> = userPreferencesRepository.hideSoldListings.stateIn(
@@ -41,6 +49,12 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = false
+    )
+
+    val walletBalance: StateFlow<Double> = userPreferencesRepository.walletBalance.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 500.00
     )
 
     // Dialog & Editing State
@@ -65,11 +79,32 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
 
     val filteredListings: StateFlow<List<ListingEntity>>
 
+    private val _checkoutResultEvent = MutableSharedFlow<String>()
+    val checkoutResultEvent = _checkoutResultEvent.asSharedFlow()
+
     init {
-        val dao = MarketplaceDatabase.getDatabase(application).listingDao()
-        repository = LocalMarketplaceRepository(dao)
+        val db = MarketplaceDatabase.getDatabase(application)
+        repository = LocalMarketplaceRepository(db.listingDao(), db.orderDao())
 
         allListings = repository.allListings.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+        allOrders = repository.allOrders.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+        purchases = repository.getPurchasesForUser(currentUserName).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+        sales = repository.getSalesForUser(currentUserName).stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
@@ -141,6 +176,12 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun addWalletBalance(amount: Double) {
+        viewModelScope.launch(Dispatchers.IO) {
+            userPreferencesRepository.addWalletBalance(amount)
+        }
+    }
+
     fun openCreateDialog() {
         _editingListing.value = null
         _isDialogOpen.value = true
@@ -208,6 +249,81 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
     fun deleteListing(listing: ListingEntity) {
         viewModelScope.launch {
             repository.deleteListing(listing)
+        }
+    }
+
+    // Checkout & Escrow flows
+    fun checkoutCartItems(cartItems: List<DigitalProduct>, onComplete: (Boolean, String) -> Unit) {
+        if (cartItems.isEmpty()) {
+            onComplete(false, "Cart is empty")
+            return
+        }
+
+        val totalAmount = cartItems.sumOf { it.price }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val deducted = userPreferencesRepository.deductWalletBalance(totalAmount)
+            if (!deducted) {
+                _checkoutResultEvent.emit("Insufficient wallet balance. Please top up your wallet.")
+                onComplete(false, "Insufficient balance")
+                return@launch
+            }
+
+            val newOrders = cartItems.map { item ->
+                val listingId = if (item.id.startsWith("lot_")) {
+                    item.id.removePrefix("lot_").toLongOrNull() ?: 0L
+                } else 0L
+
+                val seller = if (listingId > 0L) {
+                    allListings.value.find { it.id == listingId }?.sellerName ?: "MarketplaceSeller"
+                } else {
+                    "NanaDrop Direct"
+                }
+
+                OrderEntity(
+                    listingId = listingId,
+                    title = item.title,
+                    category = item.category,
+                    platform = item.platform,
+                    price = item.price,
+                    buyerName = currentUserName,
+                    sellerName = seller,
+                    status = "ESCROW",
+                    createdAt = System.currentTimeMillis(),
+                    deliveryInfo = "Digital Key / Item access code pending seller delivery."
+                )
+            }
+
+            repository.insertOrders(newOrders)
+
+            // Mark listings as sold if applicable
+            cartItems.forEach { item ->
+                if (item.id.startsWith("lot_")) {
+                    val lId = item.id.removePrefix("lot_").toLongOrNull()
+                    if (lId != null) {
+                        val listing = allListings.value.find { it.id == lId }
+                        if (listing != null) {
+                            repository.updateListing(listing.copy(isSold = true))
+                        }
+                    }
+                }
+            }
+
+            _checkoutResultEvent.emit("Checkout successful! Funds held in ESCROW.")
+            onComplete(true, "Checkout successful")
+        }
+    }
+
+    fun updateOrderStatus(order: OrderEntity, newStatus: String, deliveryCode: String = "") {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updatedDelivery = if (deliveryCode.isNotBlank()) deliveryCode else order.deliveryInfo
+            val updatedOrder = order.copy(status = newStatus, deliveryInfo = updatedDelivery)
+            repository.updateOrder(updatedOrder)
+
+            // If order completed, release escrow funds to seller if seller is user
+            if (newStatus == "COMPLETED" && order.sellerName == currentUserName) {
+                userPreferencesRepository.addWalletBalance(order.price)
+            }
         }
     }
 }

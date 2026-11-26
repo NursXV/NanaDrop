@@ -9,10 +9,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@Database(entities = [ListingEntity::class], version = 1, exportSchema = false)
+@Database(entities = [ListingEntity::class, OrderEntity::class], version = 2, exportSchema = false)
 abstract class MarketplaceDatabase : RoomDatabase() {
 
     abstract fun listingDao(): ListingDao
+    abstract fun orderDao(): OrderDao
 
     companion object {
         @Volatile
@@ -25,6 +26,7 @@ abstract class MarketplaceDatabase : RoomDatabase() {
                     MarketplaceDatabase::class.java,
                     "marketplace_database"
                 )
+                    .fallbackToDestructiveMigration()
                     .addCallback(DatabaseCallback(context.applicationContext))
                     .build()
                 INSTANCE = instance
@@ -36,8 +38,8 @@ abstract class MarketplaceDatabase : RoomDatabase() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 CoroutineScope(Dispatchers.IO).launch {
-                    val dao = getDatabase(context).listingDao()
-                    populateInitialData(dao)
+                    val listingDao = getDatabase(context).listingDao()
+                    populateInitialData(listingDao)
                 }
             }
         }

@@ -171,7 +171,9 @@ class MainActivity : ComponentActivity() {
                         composable("cart") {
                             CartScreen(
                                 viewModel = storeViewModel,
-                                onBackClick = { navController.popBackStack() }
+                                marketplaceViewModel = marketplaceViewModel,
+                                onBackClick = { navController.popBackStack() },
+                                onNavigateToOrders = { navController.navigate("orders") }
                             )
                         }
                     }

@@ -69,6 +69,10 @@ class StoreViewModel : ViewModel() {
         _cartItems.value = _cartItems.value - product
     }
 
+    fun clearCart() {
+        _cartItems.value = emptyList()
+    }
+
     fun addListingToCart(listing: ListingEntity) {
         val digitalProduct = DigitalProduct(
             id = "lot_${listing.id}",
