@@ -5,7 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Lock
@@ -18,12 +18,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.nanadrop.data.local.OrderEntity
+import com.example.nanadrop.data.local.WalletEntity
+import com.example.nanadrop.ui.util.asCurrency
 import com.example.nanadrop.ui.viewmodel.MarketplaceViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrdersScreen(
     viewModel: MarketplaceViewModel,
@@ -32,92 +33,81 @@ fun OrdersScreen(
     var selectedTab by remember { mutableStateOf(0) } // 0 = Purchases, 1 = Sales
     val purchases by viewModel.purchases.collectAsState()
     val sales by viewModel.sales.collectAsState()
-    val walletBalance by viewModel.walletBalance.collectAsState()
+    val wallet by viewModel.wallet.collectAsState()
 
     var deliveryCodeInput by remember { mutableStateOf("") }
     var selectedOrderForDelivery by remember { mutableStateOf<OrderEntity?>(null) }
+    var selectedOrderForCancel by remember { mutableStateOf<OrderEntity?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Escrow Orders")
-                        Text(
-                            "Wallet: $${String.format(Locale.US, "%.2f", walletBalance)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
+    // The app level TopAppBar shows the title, this screen owns only its content.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp)
+    ) {
+        WalletStrip(
+            wallet = wallet,
+            onBackClick = onBackClick
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        PrimaryTabRow(selectedTabIndex = selectedTab) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Purchases (${purchases.size})") }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Sales (${sales.size})") }
             )
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            TabRow(selectedTabIndex = selectedTab) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Purchases (${purchases.size})") }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Sales (${sales.size})") }
+
+        val ordersList = if (selectedTab == 0) purchases else sales
+
+        if (ordersList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (selectedTab == 0) "No purchases yet." else "No sales yet.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.outline
                 )
             }
-
-            val ordersList = if (selectedTab == 0) purchases else sales
-
-            if (ordersList.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (selectedTab == 0) "No purchases yet." else "No sales yet.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.outline
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                items(ordersList, key = { it.id }) { order ->
+                    OrderItemCard(
+                        order = order,
+                        isPurchase = selectedTab == 0,
+                        onDeliverClick = { selectedOrderForDelivery = order },
+                        onConfirmReceipt = {
+                            viewModel.updateOrderStatus(order, OrderEntity.STATUS_COMPLETED)
+                        },
+                        onCancelOrder = { selectedOrderForCancel = order },
+                        onDispute = {
+                            viewModel.updateOrderStatus(order, OrderEntity.STATUS_DISPUTED)
+                        }
                     )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(ordersList, key = { it.id }) { order ->
-                        OrderItemCard(
-                            order = order,
-                            isPurchase = selectedTab == 0,
-                            onDeliverClick = { selectedOrderForDelivery = order },
-                            onConfirmReceipt = {
-                                viewModel.updateOrderStatus(order, "COMPLETED")
-                            },
-                            onDispute = {
-                                viewModel.updateOrderStatus(order, "DISPUTED")
-                            }
-                        )
-                    }
                 }
             }
         }
     }
 
-    if (selectedOrderForDelivery != null) {
-        val targetOrder = selectedOrderForDelivery!!
+    selectedOrderForDelivery?.let { targetOrder ->
         AlertDialog(
             onDismissRequest = { selectedOrderForDelivery = null },
             title = { Text("Deliver Order Item / Key") },
@@ -137,7 +127,11 @@ fun OrdersScreen(
                 Button(
                     onClick = {
                         if (deliveryCodeInput.isNotBlank()) {
-                            viewModel.updateOrderStatus(targetOrder, "DELIVERED", deliveryCodeInput)
+                            viewModel.updateOrderStatus(
+                                targetOrder,
+                                OrderEntity.STATUS_DELIVERED,
+                                deliveryCodeInput
+                            )
                             deliveryCodeInput = ""
                             selectedOrderForDelivery = null
                         }
@@ -153,6 +147,89 @@ fun OrdersScreen(
             }
         )
     }
+
+    selectedOrderForCancel?.let { targetOrder ->
+        AlertDialog(
+            onDismissRequest = { selectedOrderForCancel = null },
+            title = { Text("Cancel escrow order?") },
+            text = {
+                Text(
+                    "${targetOrder.price.asCurrency()} will be released from escrow and returned " +
+                        "to your available balance."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateOrderStatus(targetOrder, OrderEntity.STATUS_CANCELLED)
+                        selectedOrderForCancel = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Text("Cancel order")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedOrderForCancel = null }) {
+                    Text("Keep order")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun WalletStrip(wallet: WalletEntity?, onBackClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        BalancePill(
+            label = "Available",
+            value = wallet?.availableBalance ?: 0.0,
+            accent = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f)
+        )
+        BalancePill(
+            label = "In Escrow",
+            value = wallet?.frozenBalance ?: 0.0,
+            accent = Color(0xFFE65100),
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onBackClick) { Text("Back") }
+    }
+}
+
+@Composable
+private fun BalancePill(
+    label: String,
+    value: Double,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = accent.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = accent
+            )
+            Text(
+                text = value.asCurrency(),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = accent
+            )
+        }
+    }
 }
 
 @Composable
@@ -161,9 +238,10 @@ fun OrderItemCard(
     isPurchase: Boolean,
     onDeliverClick: () -> Unit,
     onConfirmReceipt: () -> Unit,
+    onCancelOrder: () -> Unit,
     onDispute: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy · HH:mm", Locale.US) }
     val dateStr = remember(order.createdAt) { dateFormat.format(Date(order.createdAt)) }
 
     Card(
@@ -179,7 +257,7 @@ fun OrderItemCard(
             ) {
                 OrderStatusBadge(status = order.status)
                 Text(
-                    text = "$${String.format(Locale.US, "%.2f", order.price)}",
+                    text = order.price.asCurrency(),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -201,7 +279,7 @@ fun OrderItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Platform: ${order.platform} | Category: ${order.category}",
+                    text = "${order.platform} · ${order.category}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -244,60 +322,78 @@ fun OrderItemCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (!isPurchase && order.status == "ESCROW") {
+            when {
+                !isPurchase && order.status == OrderEntity.STATUS_ESCROW -> {
                     Button(
                         onClick = onDeliverClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.LocalShipping,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text("Mark Delivered")
                     }
                 }
 
-                if (isPurchase && (order.status == "ESCROW" || order.status == "DELIVERED")) {
-                    OutlinedButton(
-                        onClick = onDispute,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                isPurchase && (order.status == OrderEntity.STATUS_ESCROW ||
+                    order.status == OrderEntity.STATUS_DELIVERED) -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.ReportProblem, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Dispute")
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Button(
-                        onClick = onConfirmReceipt,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Confirm Receipt")
+                        OutlinedButton(
+                            onClick = onDispute,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Dispute", style = MaterialTheme.typography.labelMedium)
+                        }
+                        OutlinedButton(
+                            onClick = onCancelOrder,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Block,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Cancel", style = MaterialTheme.typography.labelMedium)
+                        }
+                        Button(
+                            onClick = onConfirmReceipt,
+                            modifier = Modifier.weight(1.2f),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Confirm", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
 
-                if (order.status == "COMPLETED") {
-                    Text(
-                        text = "Funds Released & Transaction Completed",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF2E7D32),
-                        fontWeight = FontWeight.Bold
-                    )
+                order.status == OrderEntity.STATUS_COMPLETED -> {
+                    StatusNote("Funds released · order completed", Color(0xFF2E7D32))
                 }
 
-                if (order.status == "DISPUTED") {
-                    Text(
-                        text = "Under Dispute Review",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Bold
-                    )
+                order.status == OrderEntity.STATUS_CANCELLED -> {
+                    StatusNote("Cancelled · escrow refunded", MaterialTheme.colorScheme.outline)
+                }
+
+                order.status == OrderEntity.STATUS_DISPUTED -> {
+                    StatusNote("Under dispute review", MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -305,31 +401,47 @@ fun OrderItemCard(
 }
 
 @Composable
+private fun StatusNote(text: String, color: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = color,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
 fun OrderStatusBadge(status: String) {
     val (backgroundColor, textColor, icon, label) = when (status) {
-        "ESCROW" -> Quadruple(
+        OrderEntity.STATUS_ESCROW -> Quadruple(
             Color(0xFFFFF3E0),
             Color(0xFFE65100),
             Icons.Default.Lock,
             "ESCROW HELD"
         )
-        "DELIVERED" -> Quadruple(
+        OrderEntity.STATUS_DELIVERED -> Quadruple(
             Color(0xFFE3F2FD),
             Color(0xFF1565C0),
             Icons.Default.LocalShipping,
             "DELIVERED"
         )
-        "COMPLETED" -> Quadruple(
+        OrderEntity.STATUS_COMPLETED -> Quadruple(
             Color(0xFFE8F5E9),
             Color(0xFF2E7D32),
             Icons.Default.Check,
             "COMPLETED"
         )
-        "DISPUTED" -> Quadruple(
+        OrderEntity.STATUS_DISPUTED -> Quadruple(
             Color(0xFFFFEBEE),
             Color(0xFFC62828),
             Icons.Default.ReportProblem,
             "DISPUTED"
+        )
+        OrderEntity.STATUS_CANCELLED -> Quadruple(
+            Color(0xFFECEFF1),
+            Color(0xFF546E7A),
+            Icons.Default.Block,
+            "CANCELLED"
         )
         else -> Quadruple(
             MaterialTheme.colorScheme.surfaceVariant,

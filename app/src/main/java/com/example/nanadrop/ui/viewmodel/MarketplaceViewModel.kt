@@ -10,10 +10,14 @@ import com.example.nanadrop.data.local.ListingEntity
 import com.example.nanadrop.data.local.MarketplaceDatabase
 import com.example.nanadrop.data.local.OrderEntity
 import com.example.nanadrop.data.local.UserPreferencesRepository
+import com.example.nanadrop.data.local.WalletEntity
 import com.example.nanadrop.data.repository.LocalMarketplaceRepository
+import com.example.nanadrop.data.repository.WalletRepository
+import com.example.nanadrop.ui.util.asCurrency
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MarketplaceViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -28,6 +32,7 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private val repository: LocalMarketplaceRepository
+    private val walletRepository: WalletRepository
     private val userPreferencesRepository = UserPreferencesRepository(application)
 
     val currentUserName = "You (CurrentUser)"
@@ -51,11 +56,14 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
         initialValue = false
     )
 
-    val walletBalance: StateFlow<Double> = userPreferencesRepository.walletBalance.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 500.00
-    )
+    /**
+     * The one and only wallet. Backed by Room so the marketplace, cart, orders and wallet
+     * screens all read the exact same balances.
+     */
+    val wallet: StateFlow<WalletEntity?>
+
+    /** Convenience view of [wallet] for price checks (null wallet is treated as 0.0). */
+    val availableBalance: StateFlow<Double>
 
     // Dialog & Editing State
     private val _isDialogOpen = MutableStateFlow(false)
@@ -79,12 +87,25 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
 
     val filteredListings: StateFlow<List<ListingEntity>>
 
-    private val _checkoutResultEvent = MutableSharedFlow<String>()
-    val checkoutResultEvent = _checkoutResultEvent.asSharedFlow()
-
     init {
         val db = MarketplaceDatabase.getDatabase(application)
         repository = LocalMarketplaceRepository(db.listingDao(), db.orderDao())
+        walletRepository = WalletRepository(db.walletDao())
+        viewModelScope.launch { walletRepository.wallet() }
+
+        wallet = walletRepository.getWallet().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+        availableBalance = wallet
+            .map { it?.availableBalance ?: 0.0 }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = 0.0
+            )
 
         allListings = repository.allListings.stateIn(
             scope = viewModelScope,
@@ -176,12 +197,6 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun addWalletBalance(amount: Double) {
-        viewModelScope.launch(Dispatchers.IO) {
-            userPreferencesRepository.addWalletBalance(amount)
-        }
-    }
-
     fun openCreateDialog() {
         _editingListing.value = null
         _isDialogOpen.value = true
@@ -253,19 +268,32 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     // Checkout & Escrow flows
+
+    /**
+     * Moves the cart total from the available balance into the frozen escrow balance (Room),
+     * records a FREEZE transaction, creates the orders and marks listings as sold.
+     *
+     * [onComplete] is always invoked on the main thread.
+     */
     fun checkoutCartItems(cartItems: List<DigitalProduct>, onComplete: (Boolean, String) -> Unit) {
         if (cartItems.isEmpty()) {
-            onComplete(false, "Cart is empty")
+            onComplete(false, "Your cart is empty")
             return
         }
 
         val totalAmount = cartItems.sumOf { it.price }
 
         viewModelScope.launch(Dispatchers.IO) {
-            val deducted = userPreferencesRepository.deductWalletBalance(totalAmount)
-            if (!deducted) {
-                _checkoutResultEvent.emit("Insufficient wallet balance. Please top up your wallet.")
-                onComplete(false, "Insufficient balance")
+            val frozen = walletRepository.freezeEscrow(
+                amount = totalAmount,
+                title = "Escrow hold · ${cartItems.size} item(s) · ${totalAmount.asCurrency()}"
+            )
+
+            if (!frozen) {
+                val available = walletRepository.wallet().availableBalance
+                val message = "Insufficient balance: ${totalAmount.asCurrency()} needed, " +
+                    "${available.asCurrency()} available."
+                withContext(Dispatchers.Main) { onComplete(false, message) }
                 return@launch
             }
 
@@ -288,7 +316,7 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
                     price = item.price,
                     buyerName = currentUserName,
                     sellerName = seller,
-                    status = "ESCROW",
+                    status = OrderEntity.STATUS_ESCROW,
                     createdAt = System.currentTimeMillis(),
                     deliveryInfo = "Digital Key / Item access code pending seller delivery."
                 )
@@ -296,34 +324,56 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
 
             repository.insertOrders(newOrders)
 
-            // Mark listings as sold if applicable
+            // Mark marketplace listings as sold so they leave the storefront.
             cartItems.forEach { item ->
                 if (item.id.startsWith("lot_")) {
-                    val lId = item.id.removePrefix("lot_").toLongOrNull()
-                    if (lId != null) {
-                        val listing = allListings.value.find { it.id == lId }
-                        if (listing != null) {
-                            repository.updateListing(listing.copy(isSold = true))
-                        }
+                    val listingId = item.id.removePrefix("lot_").toLongOrNull()
+                    val listing = listingId?.let { id -> allListings.value.find { it.id == id } }
+                    if (listing != null) {
+                        repository.updateListing(listing.copy(isSold = true))
                     }
                 }
             }
 
-            _checkoutResultEvent.emit("Checkout successful! Funds held in ESCROW.")
-            onComplete(true, "Checkout successful")
+            val message = "${totalAmount.asCurrency()} held in escrow for " +
+                "${newOrders.size} order(s)."
+            withContext(Dispatchers.Main) { onComplete(true, message) }
         }
     }
 
+    /**
+     * Applies an escrow status change and settles the money in the Room wallet.
+     *
+     * - [OrderEntity.STATUS_COMPLETED]: the escrow is released; it is credited to the
+     *   available balance + total earned when the current user is the seller.
+     * - [OrderEntity.STATUS_CANCELLED]: the frozen hold is refunded to the buyer.
+     */
     fun updateOrderStatus(order: OrderEntity, newStatus: String, deliveryCode: String = "") {
         viewModelScope.launch(Dispatchers.IO) {
             val updatedDelivery = if (deliveryCode.isNotBlank()) deliveryCode else order.deliveryInfo
-            val updatedOrder = order.copy(status = newStatus, deliveryInfo = updatedDelivery)
-            repository.updateOrder(updatedOrder)
 
-            // If order completed, release escrow funds to seller if seller is user
-            if (newStatus == "COMPLETED" && order.sellerName == currentUserName) {
-                userPreferencesRepository.addWalletBalance(order.price)
+            when (newStatus) {
+                OrderEntity.STATUS_COMPLETED -> if (order.sellerName == currentUserName) {
+                    walletRepository.creditEscrowEarning(
+                        amount = order.price,
+                        title = "Escrow payout · ${order.title}"
+                    )
+                } else {
+                    walletRepository.releaseEscrow(
+                        amount = order.price,
+                        title = "Escrow released · ${order.title}"
+                    )
+                }
+
+                OrderEntity.STATUS_CANCELLED -> if (order.buyerName == currentUserName) {
+                    walletRepository.refundEscrow(
+                        amount = order.price,
+                        title = "Escrow refund · ${order.title}"
+                    )
+                }
             }
+
+            repository.updateOrder(order.copy(status = newStatus, deliveryInfo = updatedDelivery))
         }
     }
 }

@@ -9,11 +9,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@Database(entities = [ListingEntity::class, OrderEntity::class], version = 2, exportSchema = false)
+@Database(entities = [ListingEntity::class, OrderEntity::class, WalletEntity::class, WalletTransactionEntity::class], version = 3, exportSchema = false)
 abstract class MarketplaceDatabase : RoomDatabase() {
 
     abstract fun listingDao(): ListingDao
     abstract fun orderDao(): OrderDao
+    abstract fun walletDao(): WalletDao
 
     companion object {
         @Volatile
@@ -39,12 +40,12 @@ abstract class MarketplaceDatabase : RoomDatabase() {
                 super.onCreate(db)
                 CoroutineScope(Dispatchers.IO).launch {
                     val listingDao = getDatabase(context).listingDao()
-                    populateInitialData(listingDao)
+                    populateInitialData(listingDao, context)
                 }
             }
         }
 
-        private suspend fun populateInitialData(dao: ListingDao) {
+        private suspend fun populateInitialData(dao: ListingDao, context: Context) {
             val initialListings = listOf(
                 ListingEntity(
                     title = "Steam Key: Elden Ring Nightrein Edition",
@@ -78,6 +79,12 @@ abstract class MarketplaceDatabase : RoomDatabase() {
                 )
             )
             dao.insertListings(initialListings)
+
+            val walletDao = getDatabase(context).walletDao()
+            val existingWallet = walletDao.getWalletOnce()
+            if (existingWallet == null) {
+                walletDao.insertWallet(WalletEntity(id = 0))
+            }
         }
     }
 }

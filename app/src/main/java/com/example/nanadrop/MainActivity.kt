@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,10 +29,15 @@ import com.example.nanadrop.ui.screen.DetailsScreen
 import com.example.nanadrop.ui.screen.DealsScreen
 import com.example.nanadrop.ui.screen.ListingDetailsScreen
 import com.example.nanadrop.ui.screen.MarketplaceScreen
+import com.example.nanadrop.ui.screen.OrdersScreen
 import com.example.nanadrop.ui.theme.NanaDropTheme
+import com.example.nanadrop.data.local.MarketplaceDatabase
+import com.example.nanadrop.data.repository.WalletRepository
+import com.example.nanadrop.ui.screen.WalletScreen
 import com.example.nanadrop.ui.viewmodel.DealsViewModel
 import com.example.nanadrop.ui.viewmodel.MarketplaceViewModel
 import com.example.nanadrop.ui.viewmodel.StoreViewModel
+import com.example.nanadrop.ui.viewmodel.WalletViewModel
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,6 +47,11 @@ class MainActivity : ComponentActivity() {
         MarketplaceViewModel.Factory(application)
     }
     private val dealsViewModel: DealsViewModel by viewModels()
+
+    // Wallet ViewModel (simple DI setup)
+    private val walletDao by lazy { MarketplaceDatabase.getDatabase(applicationContext).walletDao() }
+    private val walletRepository by lazy { WalletRepository(walletDao) }
+    private val walletViewModel: WalletViewModel by viewModels { WalletViewModel.Factory(walletRepository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +63,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
+                val bottomBarRoutes = setOf("marketplace", "deals", "cart", "wallet", "orders")
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -65,6 +77,8 @@ class MainActivity : ComponentActivity() {
                                         "cart" -> "Shopping Cart"
                                         "catalog" -> "Digital Product Catalog"
                                         "listing_details/{listingId}" -> "Listing Details"
+                                        "wallet" -> "Wallet"
+                                        "orders" -> "Escrow Orders"
                                         else -> "NanaDrop"
                                     }
                                 )
@@ -80,7 +94,7 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     bottomBar = {
-                        if (currentRoute == "marketplace" || currentRoute == "deals" || currentRoute == "cart") {
+                        if (currentRoute in bottomBarRoutes) {
                             NavigationBar {
                                 NavigationBarItem(
                                     icon = { Icon(Icons.Default.Storefront, contentDescription = "Marketplace") },
@@ -109,6 +123,16 @@ class MainActivity : ComponentActivity() {
                                     onClick = {
                                         if (currentRoute != "cart") {
                                             navController.navigate("cart")
+                                        }
+                                    }
+                                )
+                                NavigationBarItem(
+                                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Wallet") },
+                                    label = { Text("Wallet") },
+                                    selected = currentRoute == "wallet",
+                                    onClick = {
+                                        if (currentRoute != "wallet") {
+                                            navController.navigate("wallet")
                                         }
                                     }
                                 )
@@ -174,6 +198,15 @@ class MainActivity : ComponentActivity() {
                                 marketplaceViewModel = marketplaceViewModel,
                                 onBackClick = { navController.popBackStack() },
                                 onNavigateToOrders = { navController.navigate("orders") }
+                            )
+                        }
+                        composable("wallet") {
+                            WalletScreen(viewModel = walletViewModel)
+                        }
+                        composable("orders") {
+                            OrdersScreen(
+                                viewModel = marketplaceViewModel,
+                                onBackClick = { navController.popBackStack() }
                             )
                         }
                     }
