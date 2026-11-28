@@ -1,6 +1,6 @@
 package com.example.nanadrop.ui.screen
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,10 +43,27 @@ fun ProfileScreen(
     val isDarkMode by marketplaceViewModel.isDarkMode.collectAsState()
     val hideSold by marketplaceViewModel.hideSoldListings.collectAsState()
     val allListings by marketplaceViewModel.allListings.collectAsState()
+    val allOrders by marketplaceViewModel.allOrders.collectAsState()
     val cartCount by storeViewModel.totalCartItemsCount.collectAsState()
 
-    val userListingsCount = remember(allListings) {
-        allListings.count { it.isUserListing || it.sellerName == marketplaceViewModel.currentUserName }
+    val userListingsCount = remember(allListings, userProfile) {
+        allListings.count { listing ->
+            listing.isUserListing ||
+                listing.sellerName == userProfile.displayName ||
+                listing.sellerName == marketplaceViewModel.currentUserName ||
+                listing.sellerName == "Alex_Gamer"
+        }
+    }
+
+    val userOrdersCount = remember(allOrders, userProfile) {
+        allOrders.count { order ->
+            order.buyerName == userProfile.displayName ||
+                order.buyerName == marketplaceViewModel.currentUserName ||
+                order.buyerName == "User" ||
+                order.sellerName == userProfile.displayName ||
+                order.sellerName == marketplaceViewModel.currentUserName ||
+                order.sellerName == "Alex_Gamer"
+        }
     }
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -57,13 +74,14 @@ fun ProfileScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 1. Profile Header Card
         ProfileHeaderCard(
             profile = userProfile,
             userListingsCount = userListingsCount,
+            userOrdersCount = userOrdersCount,
             onEditClick = { showEditProfileDialog = true }
         )
 
@@ -76,6 +94,7 @@ fun ProfileScreen(
         // 3. Quick Navigation & Action Cards
         QuickActionsCard(
             cartCount = cartCount,
+            ordersCount = userOrdersCount,
             onNavigateToMyListings = onNavigateToMyListings,
             onCreateListingClick = onCreateListingClick,
             onNavigateToOrders = onNavigateToOrders,
@@ -110,10 +129,13 @@ fun ProfileScreen(
 private fun ProfileHeaderCard(
     profile: UserProfile,
     userListingsCount: Int,
+    userOrdersCount: Int,
     onEditClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
@@ -121,26 +143,27 @@ private fun ProfileHeaderCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(18.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Avatar Icon
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                    modifier = Modifier.size(68.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Profile Avatar",
-                        modifier = Modifier.size(36.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Profile Avatar",
+                            modifier = Modifier.size(38.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -165,6 +188,8 @@ private fun ProfileHeaderCard(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(2.dp))
+
                     if (profile.isVerifiedSeller) {
                         Text(
                             text = "Verified Trader & Seller",
@@ -175,11 +200,12 @@ private fun ProfileHeaderCard(
                     }
                 }
 
-                IconButton(
+                FilledTonalIconButton(
                     onClick = onEditClick,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 ) {
                     Icon(
@@ -190,7 +216,7 @@ private fun ProfileHeaderCard(
             }
 
             if (profile.bio.isNotBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = profile.bio,
                     style = MaterialTheme.typography.bodyMedium,
@@ -198,24 +224,32 @@ private fun ProfileHeaderCard(
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp))
 
-            // Seller/Buyer Stats Row
+            // Seller/Buyer Live Stats Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 StatItem(
+                    modifier = Modifier.weight(1f),
                     value = "⭐ ${profile.rating}",
                     label = "Rating"
                 )
                 StatItem(
+                    modifier = Modifier.weight(1f),
                     value = "${profile.completedDealsCount}",
-                    label = "Completed Deals"
+                    label = "Deals"
                 )
                 StatItem(
+                    modifier = Modifier.weight(1f),
                     value = "$userListingsCount",
-                    label = "Active Listings"
+                    label = "Listings"
+                )
+                StatItem(
+                    modifier = Modifier.weight(1f),
+                    value = "$userOrdersCount",
+                    label = "Orders"
                 )
             }
         }
@@ -224,16 +258,21 @@ private fun ProfileHeaderCard(
 
 @Composable
 private fun StatItem(
+    modifier: Modifier = Modifier,
     value: String,
     label: String
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
@@ -249,8 +288,9 @@ private fun WalletSummaryCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
         )
     ) {
         Column(
@@ -280,7 +320,7 @@ private fun WalletSummaryCard(
                 }
 
                 TextButton(onClick = onOpenWallet) {
-                    Text("Manage")
+                    Text("Manage", fontWeight = FontWeight.SemiBold)
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
@@ -298,9 +338,10 @@ private fun WalletSummaryCard(
                 // Available Balance Box
                 Surface(
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 1.dp
+                    tonalElevation = 2.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
@@ -323,9 +364,10 @@ private fun WalletSummaryCard(
                 // Frozen Balance Box
                 Surface(
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 1.dp
+                    tonalElevation = 2.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f))
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
@@ -350,6 +392,7 @@ private fun WalletSummaryCard(
 @Composable
 private fun QuickActionsCard(
     cartCount: Int,
+    ordersCount: Int,
     onNavigateToMyListings: () -> Unit,
     onCreateListingClick: () -> Unit,
     onNavigateToOrders: () -> Unit,
@@ -390,7 +433,7 @@ private fun QuickActionsCard(
         ) {
             QuickActionButton(
                 modifier = Modifier.weight(1f),
-                title = "Orders / Escrow",
+                title = if (ordersCount > 0) "Orders ($ordersCount)" else "Orders",
                 icon = Icons.AutoMirrored.Filled.ReceiptLong,
                 onClick = onNavigateToOrders
             )
@@ -422,7 +465,9 @@ private fun QuickActionButton(
 ) {
     OutlinedCard(
         onClick = onClick,
-        modifier = modifier
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        border = CardDefaults.outlinedCardBorder()
     ) {
         Row(
             modifier = Modifier
@@ -455,6 +500,7 @@ private fun PreferencesCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -556,6 +602,7 @@ private fun EditProfileDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
         title = {
             Text(
                 text = "Edit Profile",
@@ -592,7 +639,8 @@ private fun EditProfileDialog(
                         onSave(displayNameInput.trim(), bioInput.trim())
                     }
                 },
-                enabled = displayNameInput.isNotBlank()
+                enabled = displayNameInput.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Save Changes")
             }

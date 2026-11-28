@@ -104,4 +104,17 @@ class UserPreferencesRepository(private val context: Context) {
             preferences[PreferencesKeys.BIO] = bio
         }
     }
+
+    suspend fun incrementCompletedDeals() {
+        context.dataStore.edit { preferences ->
+            val currentCount = preferences[PreferencesKeys.COMPLETED_DEALS_COUNT] ?: 24
+            val currentRating = preferences[PreferencesKeys.RATING] ?: 4.9
+            val newCount = currentCount + 1
+            val rawRating = ((currentRating * currentCount) + 5.0) / newCount
+            val updatedRating = kotlin.math.min(5.0, (kotlin.math.round(rawRating * 10.0) / 10.0))
+
+            preferences[PreferencesKeys.COMPLETED_DEALS_COUNT] = newCount
+            preferences[PreferencesKeys.RATING] = updatedRating
+        }
+    }
 }

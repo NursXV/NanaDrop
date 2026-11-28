@@ -46,6 +46,7 @@ fun MarketplaceScreen(
     val sortOption by viewModel.sortOption.collectAsState()
     val isDialogOpen by viewModel.isDialogOpen.collectAsState()
     val editingListing by viewModel.editingListing.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
     val cartItems by storeViewModel.cartItems.collectAsState()
     val totalCartCount by storeViewModel.totalCartItemsCount.collectAsState()
 
@@ -238,6 +239,7 @@ fun MarketplaceScreen(
             if (isDialogOpen) {
                 ListingDialog(
                     editingListing = editingListing,
+                    defaultSellerName = userProfile.displayName,
                     onDismiss = { viewModel.closeDialog() },
                     onSave = { id, title, category, price, sellerName, description, platform, isUserListing, isSold ->
                         viewModel.saveListing(

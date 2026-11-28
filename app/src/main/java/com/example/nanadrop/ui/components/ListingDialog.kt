@@ -17,6 +17,7 @@ import com.example.nanadrop.data.local.ListingEntity
 @Composable
 fun ListingDialog(
     editingListing: ListingEntity?,
+    defaultSellerName: String = "Alex River",
     onDismiss: () -> Unit,
     onSave: (
         id: Long,
@@ -35,7 +36,7 @@ fun ListingDialog(
     var title by remember { mutableStateOf(editingListing?.title ?: "") }
     var category by remember { mutableStateOf(editingListing?.category ?: "Keys") }
     var priceText by remember { mutableStateOf(editingListing?.price?.toString() ?: "") }
-    var sellerName by remember { mutableStateOf(editingListing?.sellerName ?: "") }
+    var sellerName by remember { mutableStateOf(editingListing?.sellerName ?: defaultSellerName) }
     var description by remember { mutableStateOf(editingListing?.description ?: "") }
     var platform by remember { mutableStateOf(editingListing?.platform ?: "") }
     var isSold by remember { mutableStateOf(editingListing?.isSold ?: false) }
@@ -169,12 +170,13 @@ fun ListingDialog(
                     if (price == null || price < 0) priceError = true
 
                     if (title.isNotBlank() && price != null && price >= 0) {
+                        val effectiveSellerName = sellerName.ifBlank { defaultSellerName.ifBlank { "User" } }
                         onSave(
                             editingListing?.id ?: 0L,
                             title.trim(),
                             category,
                             price,
-                            if (sellerName.isBlank()) "User" else sellerName.trim(),
+                            effectiveSellerName.trim(),
                             description.trim(),
                             if (platform.isBlank()) "PC" else platform.trim(),
                             true,

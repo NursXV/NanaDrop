@@ -126,13 +126,23 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
             initialValue = emptyList()
         )
 
-        purchases = repository.getPurchasesForUser(currentUserName).stateIn(
+        purchases = combine(repository.allOrders, userProfile) { orders, profile ->
+            val name = profile.displayName
+            orders.filter { order ->
+                order.buyerName == name || order.buyerName == currentUserName || order.buyerName == "User"
+            }
+        }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-        sales = repository.getSalesForUser(currentUserName).stateIn(
+        sales = combine(repository.allOrders, userProfile) { orders, profile ->
+            val name = profile.displayName
+            orders.filter { order ->
+                order.sellerName == name || order.sellerName == currentUserName || order.sellerName == "Alex_Gamer"
+            }
+        }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
@@ -248,13 +258,14 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
         isUserListing: Boolean = true,
         isSold: Boolean = false
     ) {
+        val effectiveSellerName = sellerName.ifBlank { userProfile.value.displayName.ifBlank { currentUserName } }
         viewModelScope.launch {
             if (id == 0L) {
                 val newListing = ListingEntity(
                     title = title,
                     category = category,
                     price = price,
-                    sellerName = sellerName,
+                    sellerName = effectiveSellerName,
                     description = description,
                     platform = platform,
                     isUserListing = isUserListing,
@@ -267,7 +278,7 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
                     title = title,
                     category = category,
                     price = price,
-                    sellerName = sellerName,
+                    sellerName = effectiveSellerName,
                     description = description,
                     platform = platform,
                     isUserListing = isUserListing,
@@ -333,13 +344,15 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
                     "NanaDrop Direct"
                 }
 
+                val buyer = userProfile.value.displayName.ifBlank { currentUserName }
+
                 OrderEntity(
                     listingId = listingId,
                     title = item.title,
                     category = item.category,
                     platform = item.platform,
                     price = item.price,
-                    buyerName = currentUserName,
+                    buyerName = buyer,
                     sellerName = seller,
                     status = OrderEntity.STATUS_ESCROW,
                     createdAt = System.currentTimeMillis(),
@@ -377,8 +390,16 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch(Dispatchers.IO) {
             val updatedDelivery = if (deliveryCode.isNotBlank()) deliveryCode else order.deliveryInfo
 
+            if (order.status != OrderEntity.STATUS_COMPLETED && newStatus == OrderEntity.STATUS_COMPLETED) {
+                userPreferencesRepository.incrementCompletedDeals()
+            }
+
+            val currentName = userProfile.value.displayName
+            val isUserSeller = order.sellerName == currentName || order.sellerName == currentUserName || order.sellerName == "Alex_Gamer"
+            val isUserBuyer = order.buyerName == currentName || order.buyerName == currentUserName || order.buyerName == "User"
+
             when (newStatus) {
-                OrderEntity.STATUS_COMPLETED -> if (order.sellerName == currentUserName) {
+                OrderEntity.STATUS_COMPLETED -> if (isUserSeller) {
                     walletRepository.creditEscrowEarning(
                         amount = order.price,
                         title = "Escrow payout · ${order.title}"
@@ -390,7 +411,7 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
                     )
                 }
 
-                OrderEntity.STATUS_CANCELLED -> if (order.buyerName == currentUserName) {
+                OrderEntity.STATUS_CANCELLED -> if (isUserBuyer) {
                     walletRepository.refundEscrow(
                         amount = order.price,
                         title = "Escrow refund · ${order.title}"
