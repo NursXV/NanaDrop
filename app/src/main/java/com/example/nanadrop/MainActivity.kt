@@ -7,11 +7,12 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -22,23 +23,23 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.nanadrop.data.ProductRepository
+import com.example.nanadrop.data.local.MarketplaceDatabase
+import com.example.nanadrop.data.repository.WalletRepository
 import com.example.nanadrop.ui.components.SettingsBottomSheet
 import com.example.nanadrop.ui.screen.CartScreen
 import com.example.nanadrop.ui.screen.CatalogScreen
-import com.example.nanadrop.ui.screen.DetailsScreen
 import com.example.nanadrop.ui.screen.DealsScreen
+import com.example.nanadrop.ui.screen.DetailsScreen
 import com.example.nanadrop.ui.screen.ListingDetailsScreen
 import com.example.nanadrop.ui.screen.MarketplaceScreen
 import com.example.nanadrop.ui.screen.OrdersScreen
-import com.example.nanadrop.ui.theme.NanaDropTheme
-import com.example.nanadrop.data.local.MarketplaceDatabase
-import com.example.nanadrop.data.repository.WalletRepository
+import com.example.nanadrop.ui.screen.ProfileScreen
 import com.example.nanadrop.ui.screen.WalletScreen
+import com.example.nanadrop.ui.theme.NanaDropTheme
 import com.example.nanadrop.ui.viewmodel.DealsViewModel
 import com.example.nanadrop.ui.viewmodel.MarketplaceViewModel
 import com.example.nanadrop.ui.viewmodel.StoreViewModel
 import com.example.nanadrop.ui.viewmodel.WalletViewModel
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
@@ -63,7 +64,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
-                val bottomBarRoutes = setOf("marketplace", "deals", "cart", "wallet", "orders")
+                val bottomBarRoutes = setOf("marketplace", "deals", "cart", "wallet", "orders", "profile")
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
                                         "listing_details/{listingId}" -> "Listing Details"
                                         "wallet" -> "Wallet"
                                         "orders" -> "Escrow Orders"
+                                        "profile" -> "User Profile"
                                         else -> "NanaDrop"
                                     }
                                 )
@@ -133,6 +135,16 @@ class MainActivity : ComponentActivity() {
                                     onClick = {
                                         if (currentRoute != "wallet") {
                                             navController.navigate("wallet")
+                                        }
+                                    }
+                                )
+                                NavigationBarItem(
+                                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+                                    label = { Text("Profile") },
+                                    selected = currentRoute == "profile",
+                                    onClick = {
+                                        if (currentRoute != "profile") {
+                                            navController.navigate("profile")
                                         }
                                     }
                                 )
@@ -207,6 +219,25 @@ class MainActivity : ComponentActivity() {
                             OrdersScreen(
                                 viewModel = marketplaceViewModel,
                                 onBackClick = { navController.popBackStack() }
+                            )
+                        }
+                        composable("profile") {
+                            ProfileScreen(
+                                marketplaceViewModel = marketplaceViewModel,
+                                walletViewModel = walletViewModel,
+                                storeViewModel = storeViewModel,
+                                onNavigateToWallet = { navController.navigate("wallet") },
+                                onNavigateToOrders = { navController.navigate("orders") },
+                                onNavigateToCart = { navController.navigate("cart") },
+                                onNavigateToDeals = { navController.navigate("deals") },
+                                onNavigateToMyListings = {
+                                    marketplaceViewModel.toggleOnlyUserListings(true)
+                                    navController.navigate("marketplace")
+                                },
+                                onCreateListingClick = {
+                                    navController.navigate("marketplace")
+                                    marketplaceViewModel.openCreateDialog()
+                                }
                             )
                         }
                     }

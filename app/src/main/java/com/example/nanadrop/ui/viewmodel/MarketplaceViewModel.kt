@@ -10,6 +10,7 @@ import com.example.nanadrop.data.local.ListingEntity
 import com.example.nanadrop.data.local.MarketplaceDatabase
 import com.example.nanadrop.data.local.OrderEntity
 import com.example.nanadrop.data.local.UserPreferencesRepository
+import com.example.nanadrop.data.local.UserProfile
 import com.example.nanadrop.data.local.WalletEntity
 import com.example.nanadrop.data.repository.LocalMarketplaceRepository
 import com.example.nanadrop.data.repository.WalletRepository
@@ -54,6 +55,12 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = false
+    )
+
+    val userProfile: StateFlow<UserProfile> = userPreferencesRepository.userProfile.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = UserProfile()
     )
 
     /**
@@ -194,6 +201,24 @@ class MarketplaceViewModel(application: Application) : AndroidViewModel(applicat
     fun toggleDarkMode(darkMode: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             userPreferencesRepository.setDarkMode(darkMode)
+        }
+    }
+
+    fun updateDisplayName(displayName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            userPreferencesRepository.updateDisplayName(displayName)
+        }
+    }
+
+    fun updateBio(bio: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            userPreferencesRepository.updateBio(bio)
+        }
+    }
+
+    fun updateProfile(displayName: String, bio: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            userPreferencesRepository.updateProfile(displayName, bio)
         }
     }
 
